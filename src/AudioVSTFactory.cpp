@@ -9,6 +9,7 @@
 #include "platform/iplatform.h"
 #ifdef WIN32
 //#include <WinUser.h>
+#include <windows.h>
 #endif
 
 #include "AudioVSTHost.h"
@@ -18,22 +19,23 @@ using namespace Steinberg;
 
 
 AudioVSTFactory::AudioVSTFactory(const char* name) :
-	showtime::ZstEntityFactory(name)
+	showtime::ZstEntityFactory(name),
+	m_plugin_context(std::make_shared<Vst::HostApplication>())
 {
-//	m_events = boost::thread([this]() {
-//		// The factory thread should be in charge of updating VST modules
-//		Vst::PluginContextFactory::instance().setPluginContext(m_pluginContext.get());
-//
-//#ifdef WIN32
-//		// Windows UI event handling
-//		MSG msg;
-//		while (PeekMessage(&msg, nullptr, 0, 0))
-//		{
-//			TranslateMessage(&msg);
-//			DispatchMessage(&msg);
-//		}	
-//	});
-//#endif
+}
+
+void AudioVSTFactory::on_registered()
+{
+	register_tick();
+}
+
+void AudioVSTFactory::on_tick()
+{
+	MSG msg;
+	if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
 }
 
 void AudioVSTFactory::scan_vst_path(const std::string& path)
@@ -55,8 +57,8 @@ void AudioVSTFactory::scan_vst_path(const std::string& path)
 
 				VST3::Hosting::PluginFactory factory = module->getFactory();
 				for (auto& classInfo : factory.classInfos()){
-					add_creatable(classInfo.name().c_str(), [file, classInfo](const char* name) -> std::unique_ptr<ZstEntityBase> {
-						return std::make_unique<AudioVSTHost>((classInfo.name() + "_" + std::string(name)).c_str(), file.path().string().c_str());
+					add_creatable(classInfo.name().c_str(), [this, file, classInfo](const char* name) -> std::unique_ptr<ZstEntityBase> {
+						return std::make_unique<AudioVSTHost>((classInfo.name() + "_" + std::string(name)).c_str(), file.path().string().c_str(), m_plugin_context.get());
 					});
 				}
 			}

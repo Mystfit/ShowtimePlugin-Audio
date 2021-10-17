@@ -5,6 +5,7 @@
 
 #include <boost/thread.hpp>
 #include <public.sdk/source/vst/utility/stringconvert.h>
+#include <public.sdk/source/vst/hosting/hostclasses.h>
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 #include <pluginterfaces/gui/iplugview.h>
 #include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
@@ -16,6 +17,7 @@
 #endif
 
 #include "VSTPlugProvider.h"
+using namespace Steinberg::Vst;
 
 
 using namespace showtime;
@@ -176,15 +178,15 @@ private:
 };
 
 
-AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path) : 
+AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostApplication* plugin_context) :
 	ZstComponent(AUDIOVSTHOST_COMPONENT_TYPE, name),
 	m_module(nullptr),
 	m_plugProvider(nullptr)
 {
-	load_VST(vst_path);
+	load_VST(vst_path, plugin_context);
 }
 
-void AudioVSTHost::load_VST(const std::string& path) {
+void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugin_context) {
 	std::string error;
 	m_module = VST3::Hosting::Module::create(path, error);
 	if (!m_module) {
@@ -198,61 +200,41 @@ void AudioVSTHost::load_VST(const std::string& path) {
 
 		if (classInfo.category() == kVstAudioEffectClass)
 		{
-
-			/*  
-				TODO: This thread needs to both create the VST plugprovider, as well as pump the windows 
-			    UI message queue.
-			    This should be moved to our inherited PlugProvider and that can be responsible for creating
-			    the GUI well as managing GUI events.
-			*/
-			m_events = boost::thread([this, factory, classInfo, path]()
+			m_plugProvider = owned(new VSTPlugProvider(factory, classInfo, plugin_context));
+			if (!m_plugProvider)
 			{
-				m_plugProvider = owned(new VSTPlugProvider(factory, classInfo, false));
-				if (!m_plugProvider)
-				{
-					Log::entity(Log::Level::error, "No plugin provider found");
-					return;
-				}
-				Log::entity(Log::Level::notification, "Loaded VST {}", classInfo.name().c_str());
-				Log::entity(Log::Level::debug, "VST contains {} input and {} output buses", m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
+				Log::entity(Log::Level::error, "No plugin provider found");
+				return;
+			}
+			Log::entity(Log::Level::notification, "Loaded VST {}", classInfo.name().c_str());
+			Log::entity(Log::Level::debug, "VST contains {} input and {} output buses", m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
 
-				for (size_t idx = 0; idx < m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput); ++idx) {
-					Vst::BusInfo info;
-					m_plugProvider->getComponent()->getBusInfo(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput, idx, info);
-					auto result = m_plugProvider->getComponent()->activateBus(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput, idx, true);
-					Log::entity(Log::Level::debug, "Bus name: {}, type: {}, channels: {}, direction: {}, result: {}", VST3::StringConvert::convert(info.name), info.busType ? "aux" : "main", info.channelCount, info.direction ? "output" : "input", result);
-				}
+			for (size_t idx = 0; idx < m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput); ++idx) {
+				Vst::BusInfo info;
+				m_plugProvider->getComponent()->getBusInfo(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput, idx, info);
+				auto result = m_plugProvider->getComponent()->activateBus(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput, idx, true);
+				Log::entity(Log::Level::debug, "Bus name: {}, type: {}, channels: {}, direction: {}, result: {}", VST3::StringConvert::convert(info.name), info.busType ? "aux" : "main", info.channelCount, info.direction ? "output" : "input", result);
+			}
 
-				for (size_t idx = 0; idx < m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput); ++idx) {
-					Vst::BusInfo info;
-					m_plugProvider->getComponent()->getBusInfo(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput, idx, info);
-					auto result = m_plugProvider->getComponent()->activateBus(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput, idx, true);
-					Log::entity(Log::Level::debug, "Bus name: {}, type: {}, channels: {}, direction: {}, result: {}", VST3::StringConvert::convert(info.name), info.busType ? "aux" : "main", info.channelCount, info.direction ? "output" : "input", result);
-				}
+			for (size_t idx = 0; idx < m_plugProvider->getComponent()->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput); ++idx) {
+				Vst::BusInfo info;
+				m_plugProvider->getComponent()->getBusInfo(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput, idx, info);
+				auto result = m_plugProvider->getComponent()->activateBus(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput, idx, true);
+				Log::entity(Log::Level::debug, "Bus name: {}, type: {}, channels: {}, direction: {}, result: {}", VST3::StringConvert::convert(info.name), info.busType ? "aux" : "main", info.channelCount, info.direction ? "output" : "input", result);
+			}
 
-				auto editController = m_plugProvider->getController();
-				editController->release();
-				if (editController) {
-					createViewAndShow(editController);
-				}
+			IAudioProcessor* m_audioEffect = nullptr;
+			m_plugProvider->getComponent()->queryInterface(IAudioProcessor::iid, (void**)&m_audioEffect);
+			if (!m_plugProvider) {
+				Log::app(Log::Level::error, "Could not get audio processor from VST");
+				return;
+			}
 
-				MSG msg;
-				HWND native_window = nullptr;
-				auto native_window_info = m_window->getNativePlatformWindow();
-				if (strcmp(native_window_info.type, kPlatformTypeHWND) == 0) {
-					native_window = static_cast<HWND>(m_window->getNativePlatformWindow().ptr);
-				}
-				UpdateWindow(native_window);
-
-				if (native_window) {
-					m_window->show();
-					while (GetMessage(&msg, native_window, 0, 0))
-					{
-						TranslateMessage(&msg);
-						DispatchMessage(&msg);
-					}
-				}
-			});
+			auto editController = m_plugProvider->getController();
+			editController->release();
+			if (editController) {
+				createViewAndShow(editController);
+			}
 		}
 	}
 }
@@ -287,6 +269,7 @@ void AudioVSTHost::createViewAndShow(Vst::IEditController* controller)
 		Log::app(Log::Level::error, "Could not create window");
 		return;
 	}
+	m_window->show();
 }
 
 

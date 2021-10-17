@@ -2,11 +2,8 @@
 
 using namespace Steinberg;
 
-VSTPlugProvider::VSTPlugProvider(const PluginFactory& factory, ClassInfo info, bool plugIsGlobal) :
-	Vst::PlugProvider(factory, info, plugIsGlobal),
-	m_pluginContext(std::make_shared<Vst::HostApplication>()) 
+VSTPlugProvider::VSTPlugProvider(const PluginFactory& factory, ClassInfo info, Vst::HostApplication* plugin_context) :
+	Vst::PlugProvider(factory, info, false)
 {
-	if (!plugIsGlobal) {
-		setupPlugin(m_pluginContext.get());
-	}
+	setupPlugin(plugin_context);
 }

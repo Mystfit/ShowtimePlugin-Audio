@@ -6,8 +6,5 @@
 
 class VSTPlugProvider : public Steinberg::Vst::PlugProvider {
 public:
-	VSTPlugProvider(const PluginFactory& factory, ClassInfo info, bool plugIsGlobal = false);
-
-private:
-	std::shared_ptr<Steinberg::Vst::HostApplication> m_pluginContext;
+	VSTPlugProvider(const PluginFactory& factory, ClassInfo info, Steinberg::Vst::HostApplication* plugin_contexte);
 };

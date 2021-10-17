@@ -92,6 +92,7 @@ set(ZST_RTAUDIO_PLUGIN_HEADERS
   "${SOURCE_DIR}/AudioDevice.h"
   "${SOURCE_DIR}/AudioVSTHost.h"
   "${SOURCE_DIR}/AudioVSTFactory.h"
+  "${SOURCE_DIR}/VSTPlugProvider.h"
   "${SOURCE_DIR}/platform/iwindow.h"
   "${SOURCE_DIR}/platform/iplatform.h"
   "${SOURCE_DIR}/platform/iapplication.h"
@@ -102,12 +103,13 @@ set(ZST_RTAUDIO_PLUGIN_SRC
   "${SOURCE_DIR}/AudioDevice.cpp"
   "${SOURCE_DIR}/AudioVSTHost.cpp"
   "${SOURCE_DIR}/AudioVSTFactory.cpp"
+  "${SOURCE_DIR}/VSTPlugProvider.cpp"
   "${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/plugprovider.cpp"
-  "${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_win32.cpp"
 )
 
 if(WIN32)
   list(APPEND ZST_RTAUDIO_PLUGIN_SRC 
+    "${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_win32.cpp"
     "${SOURCE_DIR}/platform/win32/window.h"
     "${SOURCE_DIR}/platform/win32/window.cpp"
     "${SOURCE_DIR}/platform/win32/platform.cpp"
@@ -145,17 +147,19 @@ set_target_properties(${RTAUDIO_PLUGIN_TARGET} PROPERTIES
 target_link_libraries(${RTAUDIO_PLUGIN_TARGET} PRIVATE ${RTAUDIO_PLUGIN_LIBS})
 smtg_setup_universal_binary(${RTAUDIO_PLUGIN_TARGET})
 
-if(WIN32)
-  set_target_properties(${RTAUDIO_PLUGIN_TARGET} PROPERTIES LINK_FLAGS "/SUBSYSTEM:windows")
-endif()
-
 #Apps
 option(BUILD_LOOPER_APP "Build Looper app")
 if(BUILD_LOOPER_APP)
   add_executable(Looper "${SOURCE_DIR}/Looper.cpp")
+  
   target_link_libraries(Looper 
     Showtime::Showtime
     Boost::thread
   )
+
+  if(WIN32)
+    set_target_properties(Looper PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+  endif()
+
   add_dependencies(Looper ${RTAUDIO_PLUGIN_TARGET})
 endif()

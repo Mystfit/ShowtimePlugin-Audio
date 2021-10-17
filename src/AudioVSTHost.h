@@ -29,6 +29,7 @@ namespace Steinberg {
 	namespace Vst {
 		class PlugProvider;
 		class HostApplication;
+		class IAudioProcessor;
 	}
 }
 
@@ -37,18 +38,21 @@ class AudioVSTHost :
 	public virtual showtime::ZstComponent
 {
 public:
-	ZST_PLUGIN_EXPORT AudioVSTHost(const char* name, const char* vst_path);
+	ZST_PLUGIN_EXPORT AudioVSTHost(const char* name, const char* vst_path, Steinberg::Vst::HostApplication* plugin_context);
 	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 
 private:
-	void load_VST(const std::string& path);
+	void load_VST(const std::string& path, Steinberg::Vst::HostApplication* plugin_context);
 	void createViewAndShow(Steinberg::Vst::IEditController* controller);
 
 	std::shared_ptr<VST3::Hosting::Module> m_module;
 	Steinberg::IPtr<Steinberg::Vst::PlugProvider> m_plugProvider;
 
+	Steinberg::Vst::IAudioProcessor* m_audioEffect = nullptr;
+
 	Steinberg::Vst::EditorHost::WindowControllerPtr m_windowController;
 	Steinberg::Vst::EditorHost::WindowPtr m_window;
+
 
 	boost::thread m_events;
 };
