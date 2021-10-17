@@ -94,46 +94,41 @@ private:
 	ShowtimeClient m_client;
 	ShowtimeServer m_server;
 };
-
-int main(int argc, char** argv){
-	s_catch_signals();
-
-	Looper looper;
-
-	Log::app(Log::Level::notification, "Listening for audio...");
-	while (!s_interrupted) {
-		looper.get_client().poll_once();
-	}
-
-	Log::app(Log::Level::notification, "Quitting");
-	looper.get_client().destroy();
-	looper.get_server().destroy();
-	return 0;
-}
+//
+//int main(int argc, char** argv){
+//	s_catch_signals();
+//
+//	Looper looper;
+//
+//	Log::app(Log::Level::notification, "Listening for audio...");
+//	while (!s_interrupted) {
+//		looper.get_client().poll_once();
+//	}
+//
+//	Log::app(Log::Level::notification, "Quitting");
+//	looper.get_client().destroy();
+//	looper.get_server().destroy();
+//	return 0;
+//}
 
 //------------------------------------------------------------------------
 int APIENTRY wWinMain (_In_ HINSTANCE instance, _In_opt_ HINSTANCE /*prevInstance*/,
                        _In_ LPWSTR lpCmdLine, _In_ int /*nCmdShow*/)
 {
-#if !SMTG_OS_WINDOWS_ARM
-	HRESULT hr = CoInitialize (nullptr);
-	if (FAILED (hr))
-		return FALSE;
-#endif
-
-	//Steinberg::Vst::EditorHost::Platform::instance ().run (lpCmdLine, instance);
 	s_catch_signals();
 
-	//TODO: This blocks and needs to happen in its own thread!
+	// create the console
+	if (AllocConsole()) {
+		FILE* pCout;
+		freopen_s(&pCout, "CONOUT$", "w", stdout);
+		SetConsoleTitle("Debug Console");
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_RED);
+	}
 
-	boost::thread gui_thread = boost::thread([]() {
-		MSG msg;
-		while (GetMessage(&msg, nullptr, 0, 0))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	});
+	// set std::cout to use my custom streambuf
+	//outbuf ob;
+	//std::streambuf* sb = std::cout.rdbuf(&ob);
+
 
 	Looper looper;
 	Log::app(Log::Level::notification, "Listening for audio...");

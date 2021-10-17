@@ -5,6 +5,12 @@
 #include <public.sdk/source/vst/hosting/module.h>
 #include "public.sdk/source/vst/hosting/plugprovider.h"
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
+
+#include "platform/iplatform.h"
+#ifdef WIN32
+//#include <WinUser.h>
+#endif
+
 #include "AudioVSTHost.h"
 
 using namespace showtime;
@@ -14,6 +20,20 @@ using namespace Steinberg;
 AudioVSTFactory::AudioVSTFactory(const char* name) :
 	showtime::ZstEntityFactory(name)
 {
+//	m_events = boost::thread([this]() {
+//		// The factory thread should be in charge of updating VST modules
+//		Vst::PluginContextFactory::instance().setPluginContext(m_pluginContext.get());
+//
+//#ifdef WIN32
+//		// Windows UI event handling
+//		MSG msg;
+//		while (PeekMessage(&msg, nullptr, 0, 0))
+//		{
+//			TranslateMessage(&msg);
+//			DispatchMessage(&msg);
+//		}	
+//	});
+//#endif
 }
 
 void AudioVSTFactory::scan_vst_path(const std::string& path)

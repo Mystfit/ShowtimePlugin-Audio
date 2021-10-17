@@ -73,6 +73,7 @@ endif()
 # Set linked libs
 set(RTAUDIO_PLUGIN_LIBS 
     Boost::boost
+    Boost::thread
     rtaudio
     sdk_hosting
     sdk_common

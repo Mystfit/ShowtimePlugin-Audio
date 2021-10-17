@@ -4,6 +4,7 @@
 #include <showtime/entities/ZstComponent.h>
 #include <showtime/entities/ZstPlug.h>
 #include <memory>
+#include <boost/thread.hpp>
 
 #include "platform/iwindow.h"
 #include "public.sdk/source/vst/hosting/plugprovider.h"
@@ -27,8 +28,10 @@ namespace Steinberg {
 
 	namespace Vst {
 		class PlugProvider;
+		class HostApplication;
 	}
 }
+
 
 class AudioVSTHost :
 	public virtual showtime::ZstComponent
@@ -44,8 +47,8 @@ private:
 	std::shared_ptr<VST3::Hosting::Module> m_module;
 	Steinberg::IPtr<Steinberg::Vst::PlugProvider> m_plugProvider;
 
-	Steinberg::Vst::HostApplication m_pluginContext;
 	Steinberg::Vst::EditorHost::WindowControllerPtr m_windowController;
 	Steinberg::Vst::EditorHost::WindowPtr m_window;
 
+	boost::thread m_events;
 };
