@@ -44,7 +44,7 @@ void AudioVSTFactory::scan_vst_path(const std::string& path)
 	fs::path vst_dir(path);
 
 	for (const auto& file : fs::directory_iterator(vst_dir)) {
-		if (file.is_regular_file()) {
+		//if (file.is_regular_file()) {
 			if (file.path().extension() == ".vst3")
 			{
 				std::string error;
@@ -62,6 +62,6 @@ void AudioVSTFactory::scan_vst_path(const std::string& path)
 					});
 				}
 			}
-		}
+		//}
 	}
 }

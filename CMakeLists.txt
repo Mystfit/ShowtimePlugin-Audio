@@ -53,6 +53,19 @@ if(NOT rtaudio_POPULATED)
   add_subdirectory(${rtaudio_SOURCE_DIR} ${rtaudio_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
+# Get FST sdk
+FetchContent_Declare(fst 
+  GIT_REPOSITORY  https://git.iem.at/zmoelnig/FST.git
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+)
+FetchContent_GetProperties(fst)
+if(NOT fst)
+  FetchContent_Populate(fst)
+
+  include_directories(${fst_SOURCE_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 # Get VST3 sdk
 FetchContent_Declare(vst3sdk
   GIT_REPOSITORY https://github.com/steinbergmedia/vst3sdk
@@ -62,6 +75,8 @@ if(NOT vst3sdk_POPULATED)
   FetchContent_Populate(vst3sdk)
   add_subdirectory(${vst3sdk_SOURCE_DIR} ${vst3sdk_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
+
+
 
 # Get Boost
 find_package(Boost COMPONENTS ${BOOST_COMPONENTS} CONFIG)
@@ -92,6 +107,7 @@ set(ZST_RTAUDIO_PLUGIN_HEADERS
   "${SOURCE_DIR}/AudioDevice.h"
   "${SOURCE_DIR}/AudioVSTHost.h"
   "${SOURCE_DIR}/AudioVSTFactory.h"
+  "${SOURCE_DIR}/WindowController.h"
   "${SOURCE_DIR}/VSTPlugProvider.h"
   "${SOURCE_DIR}/platform/iwindow.h"
   "${SOURCE_DIR}/platform/iplatform.h"
@@ -104,6 +120,7 @@ set(ZST_RTAUDIO_PLUGIN_SRC
   "${SOURCE_DIR}/AudioVSTHost.cpp"
   "${SOURCE_DIR}/AudioVSTFactory.cpp"
   "${SOURCE_DIR}/VSTPlugProvider.cpp"
+  "${SOURCE_DIR}/WindowController.cpp"
   "${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/plugprovider.cpp"
 )
 

@@ -3,6 +3,7 @@
 #include <showtime/ZstLogging.h>
 #include <showtime/ZstFilesystemUtils.h>
 #include <signal.h>
+#include <math.h>
 
 #include <boost/thread.hpp>
 #ifdef WIN32
@@ -46,6 +47,43 @@ void s_catch_signals() {
 #endif
 }
 
+//class LogInputSignal : public ZstComponent {
+//public:
+//	LogInputSignal() {}
+//	LogInputSignal(const char* name) :
+//		ZstComponent("LOGSIGNAL", name),
+//		input_signal(std::make_shared<ZstInputPlug>("in_signal", ZstValueType::FloatList))
+//	{
+//	}
+//
+//	void on_registered() override {
+//		add_child(input_signal.get());
+//	
+//
+//	void compute(ZstInputPlug* plug) override {
+//		if (plug == input_signal.get()) {
+//			std::string buffer_str;
+//			//buffer_str += "<";
+//			float total = 0.0f;
+//			for (size_t idx = 0; idx < input_signal->size(); ++idx) {
+//				total += abs(input_signal->float_at(idx));
+//				//buffer_str += std::to_string(input_signal->float_at(idx));
+//				//buffer_str += ",";
+//			}
+//			total /= input_signal->size();
+//			int numblocks = total * 100;
+//			for (size_t block_idx = 0; block_idx < numblocks; ++block_idx) {
+//				buffer_str += "\xDB";
+//			}
+//			
+//			//buffer_str += ">";
+//			Log::app(Log::Level::debug, buffer_str.c_str());
+//		}
+//	}
+//
+//	std::shared_ptr<ZstInputPlug> input_signal;
+//};
+
 class Looper {
 public:
 	Looper() {		
@@ -53,27 +91,71 @@ public:
 		auto vst_search_path = fs::path("C:\\Program Files\\Common Files\\VST3");
 		m_client.set_plugin_data_path(vst_search_path.string().c_str());
 		m_client.init("Looper", true);
-		m_client.auto_join_by_name("LooperServer");
+		m_client.auto_join_by_name("stage");
 
-		ZstURI audio_factory_path = m_client.get_root()->URI() + ZstURI("audio_ports");
-		auto audio_factory = dynamic_cast<ZstEntityFactory*>(m_client.find_entity(audio_factory_path));
-		if (audio_factory) {
+		ZstOutputPlug* recording_plug;
+		ZstInputPlug* playback_plug;
+
+		if (auto audio_factory = dynamic_cast<ZstEntityFactory*>(m_client.find_entity(m_client.get_root()->URI() + ZstURI("audio_ports")))) {
 			ZstURIBundle bundle;
 			audio_factory->get_creatables(&bundle);
-			for (auto creatable : bundle) {
-				m_client.create_entity(creatable, (std::string(creatable.last().path()) + "_looper").c_str());
+			for (auto c : bundle) {
+				Log::app(Log::Level::warn, c.path());
 			}
+
+			// Create audio devices
+			ZstURI virtualaudioin("Looper/audio_ports/Microphone (Realtek(R) Audio)");  //VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)");
+			auto input_device = m_client.create_entity(virtualaudioin, (std::string(virtualaudioin.last().path()) + "_looper").c_str());
+			recording_plug = dynamic_cast<ZstOutputPlug*>(m_client.find_entity(input_device->URI() + ZstURI("audio_from_device")));
+
+			ZstURI virtualaudioout("Looper/audio_ports/Speakers (Realtek(R) Audio)");  //VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)");
+			auto output_device = m_client.create_entity(virtualaudioout, (std::string(virtualaudioout.last().path()) + "_looper").c_str());
+			playback_plug = dynamic_cast<ZstInputPlug*>(m_client.find_entity(output_device->URI() + ZstURI("audio_to_device")));
+			
+
+			//// Get output plug of recording audio device
+			//ZstOutputPlug* recording_plug = nullptr;
+			//ZstEntityBundle output_plug_bundle;
+			//input_device->get_child_entities(&output_plug_bundle, false, false, ZstEntityType::PLUG);
+			//for (auto p : output_plug_bundle) {
+			//	auto plug = dynamic_cast<ZstPlug*>(p);
+			//	if (plug->direction() == ZstPlugDirection::OUT_JACK) {
+			//		recording_plug = dynamic_cast<ZstOutputPlug*>(plug);
+			//		break;
+			//	}
+			//}
+			//
+			//// Get input plug of playback audio device
+			//ZstInputPlug* playback_plug = nullptr;
+			//ZstEntityBundle input_plug_bundle;
+			//output_device->get_child_entities(&input_plug_bundle, false, false, ZstEntityType::PLUG);
+			//for (auto p : input_plug_bundle) {
+			//	auto plug = dynamic_cast<ZstPlug*>(p);
+			//	if (plug->direction() == ZstPlugDirection::IN_JACK) {
+			//		playback_plug = dynamic_cast<ZstInputPlug*>(plug);
+			//		break;
+			//	}
+			//}
+			
+			//auto cable = m_client.connect_cable(playback_plug, recording_plug);
 		}
 
-		ZstURI vst_factory_path = m_client.get_root()->URI() + ZstURI("vsts");
-		auto vst_factory = dynamic_cast<ZstEntityFactory*>(m_client.find_entity(vst_factory_path));
-		if (vst_factory) {
+		if(auto vst_factory = dynamic_cast<ZstEntityFactory*>(m_client.find_entity(m_client.get_root()->URI() + ZstURI("vsts")))){
 			ZstURIBundle bundle;
 			vst_factory->get_creatables(&bundle);
 			for (auto creatable : bundle) {
-				m_client.create_entity(creatable, (std::string(creatable.last().path()) + "_looper").c_str());
+				Log::app(Log::Level::debug, creatable.path());
+				//m_client.create_entity(creatable, (std::string(creatable.last().path()) + "_looper").c_str());
 			}
 		}
+
+		ZstURI filter_path("Looper/vsts/OrilRiver"); //Looper/vsts/TAL-Filter-2 //Looper/vsts/ValhallaSupermassive //Looper/vsts/VST3 Host Checker
+		auto filter_device = m_client.create_entity(filter_path, (std::string(filter_path.last().path()) + "_looper").c_str());
+		ZstInputPlug* filter_in_plug = dynamic_cast<ZstInputPlug*>(m_client.find_entity(filter_device->URI() + ZstURI("audio_to_device")));
+		ZstOutputPlug* filter_out_plug = dynamic_cast<ZstOutputPlug*>(m_client.find_entity(filter_device->URI() + ZstURI("audio_from_device")));
+
+		auto filter_in_cable = m_client.connect_cable(filter_in_plug, recording_plug);
+		auto filter_out_cable = m_client.connect_cable(playback_plug, filter_out_plug);
 	}
 
 	~Looper() {
@@ -93,6 +175,7 @@ public:
 private:
 	ShowtimeClient m_client;
 	ShowtimeServer m_server;
+	//std::shared_ptr<LogInputSignal> m_signal_logger;
 };
 //
 //int main(int argc, char** argv){

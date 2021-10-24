@@ -25,7 +25,7 @@ AudioFactory::AudioFactory(const char* name) :
 	// Scan through devices for various capabilities
 	RtAudio::DeviceInfo info;
 
-	for (size_t device_idx = 1; device_idx < devices; device_idx++) {
+	for (size_t device_idx = 0; device_idx < devices; device_idx++) {
 		try {
 			info = m_query_audio->getDeviceInfo(device_idx);
 		}
@@ -35,7 +35,7 @@ AudioFactory::AudioFactory(const char* name) :
 		}
 
 		// Print, for example, the maximum number of output channels for each device
-		Log::app(Log::Level::notification, "Device:{}, I/O channels:{}|{}, SampleRate:{}", info.name.c_str()
+		Log::app(Log::Level::notification, "Device:{} Name:{}, I/O channels:{}|{}, SampleRate:{}", device_idx, info.name.c_str()
 			, info.inputChannels, info.outputChannels, info.preferredSampleRate);
 
 		this->add_creatable(info.name.c_str(), [info, device_idx](const char* e_name) -> std::unique_ptr<ZstEntityBase> {
