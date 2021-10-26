@@ -29,6 +29,7 @@ class AudioDevice :
 {
 public:
 	ZST_PLUGIN_EXPORT AudioDevice(const char* name, size_t device_index, size_t num_inputs, size_t num_outputs, unsigned long native_formats_bmask);
+	ZST_PLUGIN_EXPORT ~AudioDevice();
 	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 
 private:
@@ -45,8 +46,8 @@ private:
 	std::shared_ptr<showtime::ZstInputPlug> m_incoming_network_audio;
 	std::shared_ptr<showtime::ZstOutputPlug> m_outgoing_network_audio;
 	std::shared_ptr<AudioData> m_audio_data;
+	std::mutex m_incoming_audio_lock;
 
-	std::shared_ptr< boost::circular_buffer< DEVICE_BUFFER_T> > m_buffer;
-
-
+	std::shared_ptr< boost::circular_buffer< DEVICE_BUFFER_T> > m_received_network_audio_buffer_left;
+	std::shared_ptr< boost::circular_buffer< DEVICE_BUFFER_T> > m_received_network_audio_buffer_right;
 };
