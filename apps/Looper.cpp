@@ -34,8 +34,12 @@ void s_signal_handler(int signal_value) {
  
 void s_catch_signals() {
 #ifdef WIN32
-	SignalHandlerPointer previousHandler;
-	previousHandler = signal(SIGSEGV, &s_signal_handler);
+	//SignalHandlerPointer previousHandler;
+	//previousHandler = signal(SIGSEGV, &s_signal_handler);
+	signal(SIGINT, &s_signal_handler);
+	signal(SIGTERM, &s_signal_handler);
+	signal(SIGABRT, &s_signal_handler);
+	signal(SIGSEGV, &s_signal_handler);
 #else
 	struct sigaction action;
 	action.sa_handler = s_signal_handler;

@@ -1,6 +1,6 @@
 #include "plugin.h"
-#include "AudioFactory.h"
-#include "AudioVSTFactory.h"
+#include "AudioDevices/AudioFactory.h"
+#include "VST3Host/AudioVSTFactory.h"
 #include <showtime/ZstFilesystemUtils.h>
 #include <showtime/ZstLogging.h>
 
@@ -31,7 +31,7 @@ namespace showtime {
 				vst_factory->scan_vst_path(vst_data_path.string());
 		 }
 		 else {
-		 	Log::app(Log::Level::warn, "ShowtimeMidiPlugin: No plugin data path set. Can't load midi maps");
+		 	Log::app(Log::Level::warn, "ShowtimeAudioPlugin: No plugin data path set. Can't load content");
 		 }
 		add_factory(std::unique_ptr<ZstEntityFactory>(std::move(audio_factory)));
 		add_factory(std::unique_ptr<ZstEntityFactory>(std::move(vst_factory)));

@@ -10,7 +10,6 @@
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 
 #include "WindowController.h"
-
 #include "VSTPlugProvider.h"
 
 using namespace showtime;
@@ -23,7 +22,7 @@ AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostAppl
 	ZstComponent(AUDIOVSTHOST_COMPONENT_TYPE, name),
 	m_module(nullptr),
 	m_plugProvider(nullptr),
-	m_incoming_network_audio(std::make_shared<ZstInputPlug>("audio_to_device", ZstValueType::FloatList)),
+	m_incoming_network_audio(std::make_shared<ZstInputPlug>("audio_to_device", ZstValueType::FloatList, 1)),
 	m_outgoing_network_audio(std::make_shared<ZstOutputPlug>("audio_from_device", ZstValueType::FloatList)),
 	m_processContext(std::make_shared<ProcessContext>()),
 	m_elapsed_samples(0)
@@ -209,9 +208,7 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		m_processContext->timeSigDenominator = 4;
 
 		m_processContext->state |= ProcessContext::kProjectTimeMusicValid;
-		double beats_per_second = 60.0 / double(m_processContext->tempo);
-		double samples_per_beat = beats_per_second * double(m_processContext->sampleRate);
-		m_processContext->projectTimeMusic = double(m_processContext->projectTimeSamples) / samples_per_beat;
+		m_processContext->projectTimeMusic = double(m_processContext->projectTimeSamples) / (60.0 / double(m_processContext->tempo)) * double(m_processContext->sampleRate);
 
 		// Start processing VST data
 		m_audioEffect->setProcessing(true);
