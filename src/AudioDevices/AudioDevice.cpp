@@ -7,16 +7,14 @@ using namespace std::placeholders;
 
 
 AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_inputs, size_t num_outputs, unsigned long native_formats_bmask) : 
-	ZstComponent(AUDIODEVICE_COMPONENT_TYPE, ("AudioDevice_" + std::string(name)).c_str()),
+	AudioComponentBase(AUDIODEVICE_COMPONENT_TYPE, name),
 	m_audio_device(std::make_shared<RtAudio>()),
 	m_num_inputs(num_inputs),
 	m_num_outputs(num_outputs),
 	m_audio_data(std::make_shared<AudioData>()),
-	m_incoming_network_audio(std::make_shared<ZstInputPlug>("audio_to_device", ZstValueType::FloatList, 1)),
-	m_outgoing_network_audio(std::make_shared<ZstOutputPlug>("audio_from_device", ZstValueType::FloatList)),
 	bLogAmplitude(true)
 {
-	Log::entity(Log::Level::notification, "Creating audio device {} with device ID {} {}", URI().last().path(), device_index, sizeof(DEVICE_BUFFER_T));
+	Log::entity(Log::Level::notification, "Creating audio device {} with device ID {} {}", URI().last().path(), device_index, sizeof(AUDIO_BUFFER_T));
 
 	double time = 0.1;
 	unsigned long samplerate = 44100;
@@ -49,17 +47,17 @@ AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_input
 	size_t total_channels = (num_inputs + num_outputs);
 	m_audio_data->read_offset = 0;
 	m_audio_data->write_offset = 0;
-	m_audio_data->bufferBytes = bufferFrames * total_channels * sizeof(DEVICE_BUFFER_T);
+	m_audio_data->bufferBytes = bufferFrames * total_channels * sizeof(AUDIO_BUFFER_T);
 	m_audio_data->totalFrames = (unsigned long)samplerate;
 	m_audio_data->frameCounter = 0;
 	m_audio_data->channels = total_channels;
 	unsigned long totalBytes;
-	totalBytes = m_audio_data->totalFrames * total_channels * sizeof(DEVICE_BUFFER_T);
+	totalBytes = m_audio_data->totalFrames * total_channels * sizeof(AUDIO_BUFFER_T);
 	
 	// Allocate the entire data buffer before starting stream.
-	m_audio_data->buffer = boost::circular_buffer< DEVICE_BUFFER_T>(bufferFrames * total_channels);
-	m_received_network_audio_buffer_left = std::make_shared<boost::circular_buffer< DEVICE_BUFFER_T>>(bufferFrames * 4);
-	m_received_network_audio_buffer_right = std::make_shared<boost::circular_buffer< DEVICE_BUFFER_T>>(bufferFrames * 4);
+	m_audio_data->buffer = boost::circular_buffer< AUDIO_BUFFER_T>(bufferFrames * total_channels);
+	m_received_network_audio_buffer_left = std::make_shared<boost::circular_buffer< AUDIO_BUFFER_T>>(bufferFrames * 4);
+	m_received_network_audio_buffer_right = std::make_shared<boost::circular_buffer< AUDIO_BUFFER_T>>(bufferFrames * 4);
 	for (size_t idx = 0; idx < bufferFrames * 4; ++idx) {
 		m_received_network_audio_buffer_left->push_back(0.0);
 		m_received_network_audio_buffer_right->push_back(0.0);
@@ -80,19 +78,13 @@ AudioDevice::~AudioDevice()
 	}
 }
 
-void AudioDevice::on_registered()
-{
-	add_child(m_outgoing_network_audio.get());
-	add_child(m_incoming_network_audio.get());
-}
-
 void AudioDevice::compute(ZstInputPlug* plug)
 {
 	if (plug == m_incoming_network_audio.get()) {
 		float total = 0.0;
 		std::string buffer_str;
 		
-		size_t r_channel_offset = floor(abs(m_incoming_network_audio->size()*0.5));
+		size_t r_channel_offset = floor(abs(incoming_audio()->size()*0.5));
 		Log::entity(Log::Level::error, "Write");
 
 		for (size_t channel = 0; channel < 2; ++channel) {
@@ -101,7 +93,7 @@ void AudioDevice::compute(ZstInputPlug* plug)
 			for (size_t idx = 0; idx < r_channel_offset; ++idx) {
 				//float draw_buffer_end = (idx < r_channel_offset - 1) ? m_incoming_network_audio->float_at(((channel == 0) ? 0 : r_channel_offset) + idx) : 1.0;
 				std::scoped_lock<std::mutex> lock(m_incoming_audio_lock);
-				in_buf->push_back(m_incoming_network_audio->float_at(((channel == 0) ? 0 : r_channel_offset) + idx));
+				in_buf->push_back(incoming_audio()->float_at(((channel == 0) ? 0 : r_channel_offset) + idx));
 			}
 		}
 		
@@ -157,8 +149,8 @@ int AudioDevice::audio_callback(void* outputBuffer, void* inputBuffer, unsigned 
 
 	if (inputBuffer) {
 		float* samples = (float*)inputBuffer;
-		m_outgoing_network_audio->raw_value()->assign(samples, m_audio_data->channels * nBufferFrames);
-		m_outgoing_network_audio->fire();
+		outgoing_audio()->raw_value()->assign(samples, m_audio_data->channels * nBufferFrames);
+		outgoing_audio()->fire();
 	}
 
 	return 0;

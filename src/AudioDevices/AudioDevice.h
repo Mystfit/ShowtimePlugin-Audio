@@ -4,6 +4,7 @@
 #include <showtime/entities/ZstPlug.h>
 #include <boost/circular_buffer.hpp>
 #include "RtAudio.h"
+#include "../AudioComponentBase.h"
 
 #define AUDIODEVICE_COMPONENT_TYPE "audiodevice"
 
@@ -11,10 +12,9 @@
 class RtAudio;
 
 
-typedef float DEVICE_BUFFER_T;
 struct AudioData {
 	//DEVICE_BUFFER_T* buffer;
-	boost::circular_buffer< DEVICE_BUFFER_T> buffer;
+	boost::circular_buffer< AUDIO_BUFFER_T> buffer;
 	unsigned long read_offset;
 	unsigned long write_offset;
 	unsigned long bufferBytes;
@@ -25,12 +25,11 @@ struct AudioData {
 
 
 class AudioDevice :
-	public virtual showtime::ZstComponent
+	public AudioComponentBase
 {
 public:
 	ZST_PLUGIN_EXPORT AudioDevice(const char* name, size_t device_index, size_t num_inputs, size_t num_outputs, unsigned long native_formats_bmask);
 	ZST_PLUGIN_EXPORT ~AudioDevice();
-	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 
 private:
 	virtual void compute(showtime::ZstInputPlug* plug) override;
@@ -42,12 +41,10 @@ private:
 	size_t m_num_outputs;
 
 	bool bLogAmplitude;
-	
-	std::shared_ptr<showtime::ZstInputPlug> m_incoming_network_audio;
-	std::shared_ptr<showtime::ZstOutputPlug> m_outgoing_network_audio;
+
 	std::shared_ptr<AudioData> m_audio_data;
 	std::mutex m_incoming_audio_lock;
 
-	std::shared_ptr< boost::circular_buffer< DEVICE_BUFFER_T> > m_received_network_audio_buffer_left;
-	std::shared_ptr< boost::circular_buffer< DEVICE_BUFFER_T> > m_received_network_audio_buffer_right;
+	std::shared_ptr< boost::circular_buffer< AUDIO_BUFFER_T> > m_received_network_audio_buffer_left;
+	std::shared_ptr< boost::circular_buffer< AUDIO_BUFFER_T> > m_received_network_audio_buffer_right;
 };

@@ -19,11 +19,9 @@ using namespace Steinberg::Vst::EditorHost;
 
 
 AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostApplication* plugin_context) :
-	ZstComponent(AUDIOVSTHOST_COMPONENT_TYPE, name),
+	AudioComponentBase(AUDIOVSTHOST_COMPONENT_TYPE, name),
 	m_module(nullptr),
 	m_plugProvider(nullptr),
-	m_incoming_network_audio(std::make_shared<ZstInputPlug>("audio_to_device", ZstValueType::FloatList, 1)),
-	m_outgoing_network_audio(std::make_shared<ZstOutputPlug>("audio_from_device", ZstValueType::FloatList)),
 	m_processContext(std::make_shared<ProcessContext>()),
 	m_elapsed_samples(0)
 {
@@ -172,7 +170,7 @@ void AudioVSTHost::createViewAndShow(Vst::IEditController* controller)
 void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 {
 	bool processed_VST = false;
-	if (plug == m_incoming_network_audio.get()) {
+	if (plug == incoming_audio()) {
 		if (!m_audioEffect)
 			return;
 
@@ -226,7 +224,7 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 			processed_VST = true;
 			for (size_t channel = 0; channel < 2; ++channel) {
 				for (size_t out_sample = 0; out_sample < m_processData.numSamples; out_sample++) {
-					m_outgoing_network_audio->append_float(m_processData.outputs->channelBuffers32[channel][out_sample]);
+					outgoing_audio()->append_float(m_processData.outputs->channelBuffers32[channel][out_sample]);
 				}
 			}
 		}
@@ -236,13 +234,6 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		
 		// Only publish to the performance if we did work
 		if(processed_VST)
-			m_outgoing_network_audio->fire();
+			outgoing_audio()->fire();
 	}
-}
-
-
-void AudioVSTHost::on_registered()
-{
-	add_child(m_incoming_network_audio.get());
-	add_child(m_outgoing_network_audio.get());
 }

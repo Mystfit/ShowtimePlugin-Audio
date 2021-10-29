@@ -14,6 +14,7 @@
 
 #include <public.sdk/source/vst/hosting/processdata.h>
 
+#include "../AudioComponentBase.h"
 #include "WindowController.h"
 
 
@@ -39,11 +40,10 @@ namespace Steinberg {
 
 
 class AudioVSTHost :
-	public virtual showtime::ZstComponent
+	public AudioComponentBase
 {
 public:
 	ZST_PLUGIN_EXPORT AudioVSTHost(const char* name, const char* vst_path, Steinberg::Vst::HostApplication* plugin_context);
-	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 
 private:
 	void load_VST(const std::string& path, Steinberg::Vst::HostApplication* plugin_context);
@@ -67,10 +67,6 @@ private:
 	// VST GUI
 	Steinberg::Vst::EditorHost::WindowControllerPtr m_windowController;
 	Steinberg::Vst::EditorHost::WindowPtr m_window;
-
-	// Plugs
-	std::shared_ptr<showtime::ZstInputPlug> m_incoming_network_audio;
-	std::shared_ptr<showtime::ZstOutputPlug> m_outgoing_network_audio;
 
 	long long m_elapsed_samples;
 };
