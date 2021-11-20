@@ -12,12 +12,17 @@ typedef float AUDIO_BUFFER_T;
 class AudioComponentBase : public showtime::ZstComponent
 {
 public:
-	ZST_PLUGIN_EXPORT AudioComponentBase(const char* component_type, const char* name);
+	ZST_PLUGIN_EXPORT AudioComponentBase(size_t num_input_channels, size_t num_output_channels, const char* component_type, const char* name);
+	void init_plugs(size_t num_incoming_plug_channels, size_t num_outgoing_plug_channels);
+	
 	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 
-	showtime::ZstInputPlug* incoming_audio();
-	showtime::ZstOutputPlug* outgoing_audio();
+	showtime::ZstInputPlug* incoming_audio(size_t channel);
+	showtime::ZstOutputPlug* outgoing_audio(size_t channel);
+
+	size_t num_input_channels();
+	size_t num_output_channels();
 protected:
-	std::shared_ptr<showtime::ZstInputPlug> m_incoming_network_audio;
-	std::shared_ptr<showtime::ZstOutputPlug> m_outgoing_network_audio;
+	std::vector< std::unique_ptr<showtime::ZstInputPlug> > m_input_channel_plugs;
+	std::vector< std::unique_ptr<showtime::ZstOutputPlug> > m_output_channel_plugs;
 };

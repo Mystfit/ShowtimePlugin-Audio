@@ -6,13 +6,13 @@ using namespace showtime;
 using namespace std::placeholders;
 
 
-AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_inputs, size_t num_outputs, unsigned long native_formats_bmask) : 
-	AudioComponentBase(AUDIODEVICE_COMPONENT_TYPE, name),
+AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_device_inputs, size_t num_device_outputs, unsigned long native_formats_bmask) : 
+	AudioComponentBase(num_device_inputs, num_device_outputs, AUDIODEVICE_COMPONENT_TYPE, name),
 	m_audio_device(std::make_shared<RtAudio>()),
-	m_num_inputs(num_inputs),
-	m_num_outputs(num_outputs),
-	m_audio_data(std::make_shared<AudioData>()),
-	bLogAmplitude(true)
+	//m_audio_data(std::make_shared<AudioData>()),
+	bLogAmplitude(true),
+	m_total_writes(0),
+	m_total_reads(0)
 {
 	Log::entity(Log::Level::notification, "Creating audio device {} with device ID {} {}", URI().last().path(), device_index, sizeof(AUDIO_BUFFER_T));
 
@@ -22,11 +22,11 @@ AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_input
 
 	RtAudio::StreamParameters outparams;
 	outparams.deviceId = device_index;
-	outparams.nChannels = num_outputs;
+	outparams.nChannels = num_device_outputs;
 	
 	RtAudio::StreamParameters inparams;
 	inparams.deviceId = device_index;
-	inparams.nChannels = num_inputs;
+	inparams.nChannels = num_device_inputs;
 
 	bool supports_byte_format = (native_formats_bmask & RTAUDIO_SINT8) == RTAUDIO_SINT8;
 	RtAudioFormat format = RTAUDIO_FLOAT32;
@@ -38,29 +38,31 @@ AudioDevice::AudioDevice(const char* name, size_t device_index, size_t num_input
 		RtAudioCallback cb = [](void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* data) -> int {
 			return ((AudioDevice*)data)->audio_callback(outputBuffer, inputBuffer, nBufferFrames, streamTime, status, data);
 		};
-		m_audio_device->openStream((num_outputs) ? &outparams : nullptr, (num_inputs) ? &inparams : nullptr, format, samplerate, &bufferFrames, cb, (void*)this, &opts);
+		m_audio_device->openStream((num_device_outputs) ? &outparams : nullptr, (num_device_inputs) ? &inparams : nullptr, format, samplerate, &bufferFrames, cb, (void*)this, &opts);
 	} 
 	catch (RtAudioError& e) {
 		Log::entity(Log::Level::error, e.getMessage().c_str());
 	}
 
-	size_t total_channels = (num_inputs + num_outputs);
-	m_audio_data->read_offset = 0;
-	m_audio_data->write_offset = 0;
-	m_audio_data->bufferBytes = bufferFrames * total_channels * sizeof(AUDIO_BUFFER_T);
-	m_audio_data->totalFrames = (unsigned long)samplerate;
-	m_audio_data->frameCounter = 0;
-	m_audio_data->channels = total_channels;
-	unsigned long totalBytes;
-	totalBytes = m_audio_data->totalFrames * total_channels * sizeof(AUDIO_BUFFER_T);
-	
-	// Allocate the entire data buffer before starting stream.
-	m_audio_data->buffer = boost::circular_buffer< AUDIO_BUFFER_T>(bufferFrames * total_channels);
-	m_received_network_audio_buffer_left = std::make_shared<boost::circular_buffer< AUDIO_BUFFER_T>>(bufferFrames * 4);
-	m_received_network_audio_buffer_right = std::make_shared<boost::circular_buffer< AUDIO_BUFFER_T>>(bufferFrames * 4);
-	for (size_t idx = 0; idx < bufferFrames * 4; ++idx) {
-		m_received_network_audio_buffer_left->push_back(0.0);
-		m_received_network_audio_buffer_right->push_back(0.0);
+	//size_t total_channels = (num_inputs + num_outputs);
+	//m_audio_data->read_offset = 0;
+	//m_audio_data->write_offset = 0;
+	//m_audio_data->bufferBytes = bufferFrames * total_channels * sizeof(AUDIO_BUFFER_T);
+	//m_audio_data->totalFrames = (unsigned long)samplerate;
+	//m_audio_data->frameCounter = 0;
+	//m_audio_data->channels = total_channels;
+	//unsigned long totalBytes;
+	//totalBytes = m_audio_data->totalFrames * total_channels * sizeof(AUDIO_BUFFER_T);
+	//
+	//// Allocate the entire data buffer before starting stream.
+	//m_audio_data->buffer = boost::circular_buffer< AUDIO_BUFFER_T>(bufferFrames * total_channels);
+
+	for (size_t idx = 0; idx < num_device_outputs; ++idx) {
+		auto buffer = std::make_shared<boost::circular_buffer< AUDIO_BUFFER_T>>(bufferFrames * 4);
+		for (size_t idx = 0; idx < bufferFrames * 4; ++idx) {
+			buffer->push_back(0.0);
+		}
+		m_incoming_graph_audio_channel_buffers.push_back(buffer);
 	}
 
 	try {
@@ -80,78 +82,103 @@ AudioDevice::~AudioDevice()
 
 void AudioDevice::compute(ZstInputPlug* plug)
 {
-	if (plug == m_incoming_network_audio.get()) {
-		float total = 0.0;
-		std::string buffer_str;
+	float total = 0.0;
+	std::string buffer_str;
 		
-		size_t r_channel_offset = floor(abs(incoming_audio()->size()*0.5));
-		Log::entity(Log::Level::error, "Write");
+	for (size_t channel = 0; channel < m_input_channel_plugs.size(); ++channel) {
+		if (auto channel_plug = incoming_audio(channel)) {
+			if (m_incoming_graph_audio_channel_buffers.size() == m_input_channel_plugs.size()) {
+				auto in_buf = m_incoming_graph_audio_channel_buffers[channel];
+				auto num_frames = channel_plug->size();
+				for (size_t frame_idx = 0; frame_idx < num_frames; ++frame_idx) {
+					std::scoped_lock<std::mutex> lock(m_incoming_audio_lock);
+					auto val = channel_plug->float_at(frame_idx);
+					in_buf->push_back(val);
 
-		for (size_t channel = 0; channel < 2; ++channel) {
-			auto in_buf = (channel == 0) ? m_received_network_audio_buffer_left : m_received_network_audio_buffer_right;
-			auto channel_offset = (channel == 0) ? 0 : r_channel_offset;
-			for (size_t idx = 0; idx < r_channel_offset; ++idx) {
-				//float draw_buffer_end = (idx < r_channel_offset - 1) ? m_incoming_network_audio->float_at(((channel == 0) ? 0 : r_channel_offset) + idx) : 1.0;
-				std::scoped_lock<std::mutex> lock(m_incoming_audio_lock);
-				in_buf->push_back(incoming_audio()->float_at(((channel == 0) ? 0 : r_channel_offset) + idx));
+					if (bLogAmplitude) {
+						total += abs(val);
+					}
+				}
+
+				if (bLogAmplitude && total > 0.0) {
+					total /= num_frames;
+					int numblocks = total * 100;
+					for (size_t block_idx = 0; block_idx < numblocks; ++block_idx) {
+						buffer_str += "\xDB";
+					}
+
+					Log::app(Log::Level::debug, buffer_str.c_str());
+				}
 			}
 		}
-		
-		//m_received_network_audio_buffer_left->assign(m_incoming_network_audio->raw_value()->float_buffer(), m_incoming_network_audio->raw_value()->float_buffer() + r_channel_offset-1);
-		//m_received_network_audio_buffer_right->assign(m_incoming_network_audio->raw_value()->float_buffer() + r_channel_offset, m_incoming_network_audio->raw_value()->float_buffer() + m_incoming_network_audio->size());
-		
-		/*for (size_t idx = 0; idx < m_received_network_audio_buffer->size(); ++idx) {
-			if (bLogAmplitude) {
-				float val = m_received_network_audio_buffer->at(idx);
-				total += abs(val);
-			}
-		}
-
-		if (bLogAmplitude && total > 0.0) {
-			total /= plug->size();
-			int numblocks = total * 100;
-			for (size_t block_idx = 0; block_idx < numblocks; ++block_idx) {
-				buffer_str += "\xDB";
-			}
-
-			Log::app(Log::Level::debug, buffer_str.c_str());
-		}*/
 	}
+	m_total_writes++;
+	
+	//outgoing_audio()->fire();
+	ZstComponent::compute(plug);
 }
 
 int AudioDevice::audio_callback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* data)
 {
 	AudioDevice* data_this = (AudioDevice*)data;
+	if (!data_this)
+		return 0;
+
 	if (outputBuffer) {
-		if (status == RTAUDIO_OUTPUT_UNDERFLOW) {
-			Log::entity(Log::Level::warn, "Output underflow");
-		}
-		else if (status == RTAUDIO_INPUT_OVERFLOW) {
-			Log::entity(Log::Level::warn, "Input overflow");
-		}
-
-		float* samples = (float*)outputBuffer;
-		for (size_t channel = 0; channel < m_audio_data->channels; ++channel) {
-			auto channel_buffer = (channel == 0) ? m_received_network_audio_buffer_left : m_received_network_audio_buffer_right;
-
-			if (channel_buffer->size() > nBufferFrames) {
-				for (auto offset = 0; offset < nBufferFrames; ++offset) {
-					std::scoped_lock<std::mutex> lock(m_incoming_audio_lock);
-					*(samples++) = channel_buffer->front(); //read_offset
-					channel_buffer->pop_front();
-				}
-				if (!channel_buffer->size()) {
-					Log::entity(Log::Level::warn, "Audio in buffer empty!");
-				}
-			}
-		}
+		data_this->SendAudioToDevice(status, outputBuffer, nBufferFrames);
 	}
 
 	if (inputBuffer) {
-		float* samples = (float*)inputBuffer;
-		outgoing_audio()->raw_value()->assign(samples, m_audio_data->channels * nBufferFrames);
-		outgoing_audio()->fire();
+		data_this->ReceiveAudioFromDevice(status, inputBuffer, nBufferFrames);
+		data_this->execute();
 	}
 
 	return 0;
+}
+
+void AudioDevice::SendAudioToDevice(const RtAudioStreamStatus& status, void * outputBuffer, unsigned int& nBufferFrames)
+{
+	if (m_incoming_graph_audio_channel_buffers.size() != this->num_input_channels()) {
+		Log::entity(Log::Level::warn, "Mismatch between total ougoing audio buffers and incoming channel plugs.");
+		return;
+	}
+
+	if (status == RTAUDIO_OUTPUT_UNDERFLOW) {
+		Log::entity(Log::Level::warn, "Output underflow");
+	}
+	else if (status == RTAUDIO_INPUT_OVERFLOW) {
+		Log::entity(Log::Level::warn, "Input overflow");
+	}
+
+
+	float* samples = (float*)outputBuffer;
+
+	for (size_t channel = 0; channel < m_incoming_graph_audio_channel_buffers.size(); ++channel) {
+		auto channel_buffer = m_incoming_graph_audio_channel_buffers[channel];
+
+		//if (channel_buffer->size() > nBufferFrames) {
+		for (auto offset = 0; offset < nBufferFrames; ++offset) {
+			std::scoped_lock<std::mutex> lock(m_incoming_audio_lock);
+			*(samples++) = channel_buffer->front(); //read_offset
+			channel_buffer->pop_front();
+		}
+		if (!channel_buffer->size()) {
+			Log::entity(Log::Level::warn, "Audio in buffer empty!");
+		}
+		//}
+	}
+	m_total_reads++;
+}
+
+void AudioDevice::ReceiveAudioFromDevice(const RtAudioStreamStatus& status, void * inputBuffer, unsigned int nBufferFrames)
+{
+	float* samples = (float*)inputBuffer;
+	int channel_offset = 0;
+
+	for (size_t channel_idx = 0; channel_idx < this->num_output_channels(); ++channel_idx) {
+		channel_offset = channel_idx * nBufferFrames;
+		outgoing_audio(channel_idx)->raw_value()->assign(channel_offset + samples, nBufferFrames);
+		outgoing_audio(channel_idx)->fire();
+	}
+	//outgoing_audio()->raw_value()->assign(samples, m_audio_data->channels * nBufferFrames);
 }

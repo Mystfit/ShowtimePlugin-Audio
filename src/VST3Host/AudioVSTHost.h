@@ -50,6 +50,8 @@ private:
 	void createViewAndShow(Steinberg::Vst::IEditController* controller);
 	void compute(showtime::ZstInputPlug* plug) override;
 
+	void on_registered() override;
+
 	// VST setup
 	bool prepareProcessing();
 
@@ -67,6 +69,9 @@ private:
 	// VST GUI
 	Steinberg::Vst::EditorHost::WindowControllerPtr m_windowController;
 	Steinberg::Vst::EditorHost::WindowPtr m_window;
+
+	// MIDI
+	std::unique_ptr<showtime::ZstInputPlug> m_midi_in;
 
 	long long m_elapsed_samples;
 };

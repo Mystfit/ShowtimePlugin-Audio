@@ -7,6 +7,7 @@
 #include <boost/range/join.hpp>
 #include <public.sdk/source/vst/utility/stringconvert.h>
 #include <public.sdk/source/vst/hosting/hostclasses.h>
+#include <public.sdk/source/vst/hosting/eventlist.h>
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 
 #include "WindowController.h"
@@ -19,11 +20,12 @@ using namespace Steinberg::Vst::EditorHost;
 
 
 AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostApplication* plugin_context) :
-	AudioComponentBase(AUDIOVSTHOST_COMPONENT_TYPE, name),
+	AudioComponentBase(0, 0, AUDIOVSTHOST_COMPONENT_TYPE, name),
 	m_module(nullptr),
 	m_plugProvider(nullptr),
 	m_processContext(std::make_shared<ProcessContext>()),
-	m_elapsed_samples(0)
+	m_elapsed_samples(0),
+	m_midi_in(std::make_unique<ZstInputPlug>("IN_midi", ZstValueType::ByteList, 1, false))
 {
 	m_processSetup.processMode = kRealtime;
 	m_processSetup.symbolicSampleSize = kSample32;
@@ -36,6 +38,14 @@ AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostAppl
 
 	load_VST(vst_path, plugin_context);
 }
+
+void AudioVSTHost::on_registered() {
+	AudioComponentBase::on_registered();
+
+	// TODO: Only add the midi input plug if the VST supports input event buses
+	//add_child(m_midi_in.get());
+}
+
 
 void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugin_context) {
 
@@ -73,6 +83,7 @@ void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugi
 				return;
 			}
 
+			// Query VST requirements
 			FUnknownPtr<Vst::IProcessContextRequirements> contextRequirements(m_audioEffect);
 			if (contextRequirements) {
 				auto flags = contextRequirements->getProcessContextRequirements();
@@ -92,7 +103,6 @@ void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugi
 #undef PRINT_FLAG
 			}
 
-
 			// Get the edit controller for GUI and parameter control
 			auto editController = m_plugProvider->getController();
 			editController->release();
@@ -100,27 +110,44 @@ void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugi
 				createViewAndShow(editController);
 			}
 
-			// Query buses
-			Log::entity(Log::Level::debug, "VST contains {} input and {} output buses", m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
-			BusInfo in_info;
+			// Query audio buses
+			Log::entity(Log::Level::debug, "VST contains {} input audio and {} output audio buses", m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
 			BusInfo out_info;
-			m_vstPlug->getBusInfo(kAudio, kInput, 0, in_info);
-			m_vstPlug->getBusInfo(kAudio, kOutput, 0, out_info);
-			m_vstPlug->activateBus(kAudio, kInput, 0, true);
-			m_vstPlug->activateBus(kAudio, kOutput, 0, true);
-			
+			for (size_t bus_idx = 0; bus_idx < m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput); ++bus_idx) {
+				BusInfo in_info;
+				m_vstPlug->getBusInfo(kAudio, kInput, bus_idx, in_info);
+				m_vstPlug->activateBus(kAudio, kInput, bus_idx, true);
+			}
+
+			for (size_t bus_idx = 0; bus_idx < m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput); ++bus_idx) {
+				BusInfo out_info;
+				m_vstPlug->getBusInfo(kAudio, kOutput, bus_idx, out_info);
+				m_vstPlug->activateBus(kAudio, kOutput, bus_idx, true);
+			}
+
+			// Query event busses
+			for (size_t bus_idx = 0; bus_idx < m_vstPlug->getBusCount(Vst::MediaTypes::kEvent, Vst::BusDirections::kInput); ++bus_idx) {
+				BusInfo in_event_info;
+				m_vstPlug->getBusInfo(kEvent, kInput, bus_idx, in_event_info);
+				m_vstPlug->activateBus(kEvent, kInput, bus_idx, true);
+			}
+
+			// Setup speakers
 			SpeakerArrangement input_arr;
 			SpeakerArrangement output_arr;
 			m_audioEffect->getBusArrangement(kInput, 0, input_arr);
 			m_audioEffect->getBusArrangement(kOutput, 0, output_arr);
-			
-			 tresult res = m_audioEffect->setBusArrangements(&input_arr, 1, &output_arr, 1);
-			 if (!res)
+			tresult res = m_audioEffect->setBusArrangements(&input_arr, 1, &output_arr, 1);
+			if (!res)
 				 Log::entity(Log::Level::debug, "Failed to set bus properties");
 
+			// Prepare VST for audio processing
 			prepareProcessing();
 			if (m_vstPlug->setActive(true) != kResultTrue)
 				Log::entity(Log::Level::error, "Couldn't activate VST component");
+
+			// Setup plugs for VST channels
+			init_plugs(m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
 		}
 	}
 }
@@ -170,23 +197,24 @@ void AudioVSTHost::createViewAndShow(Vst::IEditController* controller)
 void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 {
 	bool processed_VST = false;
-	if (plug == incoming_audio()) {
-		if (!m_audioEffect)
-			return;
+	if (m_audioEffect){
 
 		// Read floats from plug into VST buffer
-
 		if (m_processData.inputs) {
-			for (size_t channel = 0; channel < 2; ++channel) {
-				size_t channel_start_offset = floor(plug->size() * 0.5) * channel;
-				size_t channel_sample = channel_start_offset + floor(plug->size() * 0.5);
-				std::copy(plug->raw_value()->float_buffer() + channel_start_offset, plug->raw_value()->float_buffer() + channel_sample, m_processData.inputs->channelBuffers32[channel]);
+			for (size_t channel_idx = 0; channel_idx < num_input_channels(); ++channel_idx) {
+				//size_t channel_start_offset = floor(incoming_audio(channel)->size() * 0.5) * channel;
+				//size_t channel_sample = incoming_audio(channel_idx)->size();
+				std::copy(
+					incoming_audio(channel_idx)->raw_value()->float_buffer(),
+					incoming_audio(channel_idx)->raw_value()->float_buffer() + incoming_audio(channel_idx)->size(),
+					m_processData.inputs->channelBuffers32[channel_idx]
+				);
 			}
 		}
 
 		// Set process context info
-		int samplesize = floor(double(plug->size()) * 0.5);
-		m_elapsed_samples += samplesize;//floor(plug->size() * 0.5);
+		int samplesize = floor(double((num_input_channels()) ? incoming_audio(0)->size() : 0) * 0.5);
+		m_elapsed_samples += samplesize;//floor(incoming_audio()->size() * 0.5);
 		
 		m_processContext->state = ProcessContext::kPlaying;// | ProcessContext::kRecording | ProcessContext::kCycleActive;
 		m_processContext->sampleRate = m_processSetup.sampleRate;
@@ -208,6 +236,20 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		m_processContext->state |= ProcessContext::kProjectTimeMusicValid;
 		m_processContext->projectTimeMusic = double(m_processContext->projectTimeSamples) / (60.0 / double(m_processContext->tempo)) * double(m_processContext->sampleRate);
 
+		// Add incoming notes
+		NoteOnEvent noteOn;
+		noteOn.channel = 0;
+		noteOn.pitch = 64;
+		
+		Event event;
+		event.busIndex = 0;
+		event.type = Event::EventTypes::kNoteOnEvent;
+		event.noteOn = noteOn;
+
+		EventList midi_events;
+		midi_events.addEvent(event);
+		m_processData.inputEvents = &midi_events;
+
 		// Start processing VST data
 		m_audioEffect->setProcessing(true);
 		tresult result = m_audioEffect->process(m_processData);
@@ -222,18 +264,17 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		// Copy VST data into plug
 		if (m_processData.outputs) {
 			processed_VST = true;
-			for (size_t channel = 0; channel < 2; ++channel) {
+			for (size_t channel_idx = 0; channel_idx < num_output_channels(); ++channel_idx) {
 				for (size_t out_sample = 0; out_sample < m_processData.numSamples; out_sample++) {
-					outgoing_audio()->append_float(m_processData.outputs->channelBuffers32[channel][out_sample]);
+					outgoing_audio(channel_idx)->append_float(m_processData.outputs->channelBuffers32[channel_idx][out_sample]);
 				}
+				outgoing_audio(channel_idx)->fire();
 			}
 		}
 		else {
 			Log::entity(Log::Level::error, "Can't publish output VST samples. Output buffer is null");
 		}
-		
-		// Only publish to the performance if we did work
-		if(processed_VST)
-			outgoing_audio()->fire();
 	}
+
+	ZstComponent::compute(plug);
 }
