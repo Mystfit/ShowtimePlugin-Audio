@@ -2,25 +2,16 @@
 
 #include <showtime/entities/ZstComponent.h>
 #include <showtime/entities/ZstPlug.h>
-#include <boost/circular_buffer.hpp>
+#include <boost/thread.hpp>
 #include "RtAudio.h"
 #include "../AudioComponentBase.h"
+#include "../ringbuffer.h"
 
 #define AUDIODEVICE_COMPONENT_TYPE "audiodevice"
+#define AUDIO_BUFFER_FRAMES 512
 
 // Forwards
 class RtAudio;
-
-
-//struct AudioData {
-//	//DEVICE_BUFFER_T* buffer;
-//	unsigned long read_offset;
-//	unsigned long write_offset;
-//	unsigned long bufferBytes;
-//	unsigned long totalFrames;
-//	unsigned long frameCounter;
-//	unsigned int channels;
-//};
 
 
 class AudioDevice :
@@ -31,7 +22,10 @@ public:
 	ZST_PLUGIN_EXPORT ~AudioDevice();
 
 private:
-	virtual void compute(showtime::ZstInputPlug* plug) override;
+	void on_registered() override;
+	
+	void process_graph();
+	void compute(showtime::ZstInputPlug* plug) override;
 	
 	// Audio callback for processing incoming/outgoing device audio
 	// ------------------------------------------------------------
@@ -45,8 +39,12 @@ private:
 	bool bLogAmplitude;
 	size_t m_total_writes;
 	size_t m_total_reads;
+	unsigned int m_buffer_frames;
 
 	//std::shared_ptr<AudioData> m_audio_data;
+	boost::thread m_audio_graph_thread;
 	std::mutex m_incoming_audio_lock;
-	std::vector < std::shared_ptr< boost::circular_buffer< AUDIO_BUFFER_T> > > m_incoming_graph_audio_channel_buffers;
+	std::mutex m_outgoing_audio_lock;
+	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_incoming_graph_audio_channel_buffers;
+	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_outgoing_graph_audio_channel_buffers;
 };

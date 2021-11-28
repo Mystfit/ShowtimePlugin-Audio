@@ -202,8 +202,6 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		// Read floats from plug into VST buffer
 		if (m_processData.inputs) {
 			for (size_t channel_idx = 0; channel_idx < num_input_channels(); ++channel_idx) {
-				//size_t channel_start_offset = floor(incoming_audio(channel)->size() * 0.5) * channel;
-				//size_t channel_sample = incoming_audio(channel_idx)->size();
 				std::copy(
 					incoming_audio(channel_idx)->raw_value()->float_buffer(),
 					incoming_audio(channel_idx)->raw_value()->float_buffer() + incoming_audio(channel_idx)->size(),
@@ -265,9 +263,7 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		if (m_processData.outputs) {
 			processed_VST = true;
 			for (size_t channel_idx = 0; channel_idx < num_output_channels(); ++channel_idx) {
-				for (size_t out_sample = 0; out_sample < m_processData.numSamples; out_sample++) {
-					outgoing_audio(channel_idx)->append_float(m_processData.outputs->channelBuffers32[channel_idx][out_sample]);
-				}
+				outgoing_audio(channel_idx)->raw_value()->assign(m_processData.outputs->channelBuffers32[channel_idx], m_processData.numSamples);
 				outgoing_audio(channel_idx)->fire();
 			}
 		}

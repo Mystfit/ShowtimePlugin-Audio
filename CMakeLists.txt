@@ -65,10 +65,12 @@ set(SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/src")
 set(ZST_AUDIO_PLUGIN_HEADERS
   "${SOURCE_DIR}/plugin.h"
   "${SOURCE_DIR}/AudioComponentBase.h"
+  "${SOURCE_DIR}/ringbuffer.h"
 )
 set(ZST_AUDIO_PLUGIN_SRC
   "${SOURCE_DIR}/plugin.cpp"
   "${SOURCE_DIR}/AudioComponentBase.cpp"
+  "${SOURCE_DIR}/ringbuffer.cpp"
 )
 
 # Plugin compile defs
