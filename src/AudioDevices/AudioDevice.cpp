@@ -77,10 +77,13 @@ void AudioDevice::on_registered()
 void AudioDevice::process_graph()
 {
 	while(true){
-		bool has_audio = m_outgoing_graph_audio_channel_buffers.size() > 0 ? m_outgoing_graph_audio_channel_buffers[0]->numItemsAvailableForRead() > m_buffer_frames : false;
+		//bool has_audio = m_outgoing_graph_audio_channel_buffers.size() > 0 ? m_outgoing_graph_audio_channel_buffers[0]->numItemsAvailableForRead() > m_buffer_frames : false;
 		try {
-			if (has_audio)
-				this->execute();
+			//if (has_audio)
+			std::unique_lock<std::mutex> lock(m_outgoing_audio_lock);
+			m_outgoing_audio_cv.wait(lock, [this]() { return m_audio_buffer_received_samples; });
+			m_audio_buffer_received_samples = false;
+			this->execute();
 		}
 		catch (boost::thread_interrupted e) { break; }
 	}
@@ -191,4 +194,6 @@ void AudioDevice::ReceiveAudioFromDevice(const RtAudioStreamStatus& status, void
 	for (size_t channel_idx = 0; channel_idx < this->num_output_channels(); ++channel_idx) {
 		m_outgoing_graph_audio_channel_buffers[channel_idx]->push(samples, nBufferFrames);
 	}
+	m_audio_buffer_received_samples = true;
+	m_outgoing_audio_cv.notify_one();
 }

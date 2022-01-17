@@ -74,14 +74,20 @@ public:
 			// Create audio devices
 			ZstURI virtualaudioin("Looper/audio_ports/Microphone (Realtek(R) Audio)");  //VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)"); //CABLE-A Output (VB-Audio Cable A) //Microphone (Realtek(R) Audio)
 			auto input_device = m_client.create_entity(virtualaudioin, (std::string(virtualaudioin.last().path()) + "_looper").c_str());
-			recording_plug = dynamic_cast<ZstOutputPlug*>(m_client.find_entity(input_device->URI() + ZstURI("audio_from_device")));
+			if(input_device)
+				recording_plug = dynamic_cast<ZstOutputPlug*>(m_client.find_entity(input_device->URI() + ZstURI("audio_from_device")));
 
 			ZstURI virtualaudioout("Looper/audio_ports/Speakers (Realtek(R) Audio)");  //VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)"); //Speakers (Realtek(R) Audio) //CABLE-A Input (VB-Audio Cable A)
 			auto output_device = m_client.create_entity(virtualaudioout, (std::string(virtualaudioout.last().path()) + "_looper").c_str());
-			playback_plug = dynamic_cast<ZstInputPlug*>(m_client.find_entity(output_device->URI() + ZstURI("audio_to_device")));
+			if(output_device)
+				playback_plug = dynamic_cast<ZstInputPlug*>(m_client.find_entity(output_device->URI() + ZstURI("audio_to_device")));
 
 			ZstURI physaudioout("Looper/audio_ports/CABLE-A Input (VB-Audio Cable A)");
 			auto phys_output_device = m_client.create_entity(physaudioout, (std::string(physaudioout.last().path()) + "_looper").c_str());
+
+			// Create ASIO device
+			ZstURI asio_path("Looper/audio_ports/ASIO4ALL v2");  //VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)"); //CABLE-A Output (VB-Audio Cable A) //Microphone (Realtek(R) Audio)
+			//auto asio_device = m_client.create_entity(asio_path, (std::string(asio_path.last().path())).c_str());
 			
 
 			//// Get output plug of recording audio device
