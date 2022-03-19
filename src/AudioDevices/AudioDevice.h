@@ -6,6 +6,7 @@
 #include "RtAudio.h"
 #include "../AudioComponentBase.h"
 #include "../ringbuffer.h"
+#include "../AudioSpinMutex.h"
 
 #define AUDIODEVICE_COMPONENT_TYPE "audiodevice"
 #define AUDIO_BUFFER_FRAMES 512
@@ -43,9 +44,9 @@ private:
 
 	//std::shared_ptr<AudioData> m_audio_data;
 	boost::thread m_audio_graph_thread;
-	std::mutex m_incoming_audio_lock;
-	std::mutex m_outgoing_audio_lock;
-	std::condition_variable m_outgoing_audio_cv;
+	AudioSpinMutex m_outgoing_audio_lock;
+	//AudioSpinMutex m_incoming_audio_lock;
+	//std::condition_variable m_outgoing_audio_cv;
 	bool m_audio_buffer_received_samples;
 	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_incoming_graph_audio_channel_buffers;
 	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_outgoing_graph_audio_channel_buffers;

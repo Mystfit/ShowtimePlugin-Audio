@@ -71,6 +71,8 @@ AudioDevice::~AudioDevice()
 void AudioDevice::on_registered()
 {
 	AudioComponentBase::on_registered();
+
+	// Start a thread to handle executing the audio graph when audio data is available
 	m_audio_graph_thread = boost::thread(boost::bind(&AudioDevice::process_graph, this));
 }
 
@@ -80,10 +82,12 @@ void AudioDevice::process_graph()
 		//bool has_audio = m_outgoing_graph_audio_channel_buffers.size() > 0 ? m_outgoing_graph_audio_channel_buffers[0]->numItemsAvailableForRead() > m_buffer_frames : false;
 		try {
 			//if (has_audio)
-			std::unique_lock<std::mutex> lock(m_outgoing_audio_lock);
-			m_outgoing_audio_cv.wait(lock, [this]() { return m_audio_buffer_received_samples; });
-			m_audio_buffer_received_samples = false;
 			this->execute();
+			/*if (m_outgoing_audio_lock.try_lock()) {
+				m_audio_buffer_received_samples = false;
+				this->execute();
+				m_outgoing_audio_lock.unlock();
+			}*/
 		}
 		catch (boost::thread_interrupted e) { break; }
 	}
@@ -195,5 +199,5 @@ void AudioDevice::ReceiveAudioFromDevice(const RtAudioStreamStatus& status, void
 		m_outgoing_graph_audio_channel_buffers[channel_idx]->push(samples, nBufferFrames);
 	}
 	m_audio_buffer_received_samples = true;
-	m_outgoing_audio_cv.notify_one();
+	m_outgoing_audio_lock.unlock();
 }
