@@ -314,7 +314,7 @@ void AudioVSTHost::compute(showtime::ZstInputPlug* plug)
 		} catch(std::out_of_range e){}
 	}
 
-	ZstComponent::compute(plug);
+	ZstComputeComponent::compute(plug);
 }
 
 void AudioVSTHost::ProcessAudio()

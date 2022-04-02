@@ -82,12 +82,16 @@ void AudioDevice::process_graph()
 		//bool has_audio = m_outgoing_graph_audio_channel_buffers.size() > 0 ? m_outgoing_graph_audio_channel_buffers[0]->numItemsAvailableForRead() > m_buffer_frames : false;
 		try {
 			//if (has_audio)
-			this->execute();
-			/*if (m_outgoing_audio_lock.try_lock()) {
+			std::unique_lock<std::mutex> lk(m_graph_mtx);
+			m_trigger_process_graph.wait(lk, [this] { 
+				return m_outgoing_graph_audio_channel_buffers.size() > 0 ? m_outgoing_graph_audio_channel_buffers[0]->numItemsAvailableForRead() > m_buffer_frames : false; 
+			});
+
+			//if (m_outgoing_audio_lock.try_lock()) {
 				m_audio_buffer_received_samples = false;
-				this->execute();
-				m_outgoing_audio_lock.unlock();
-			}*/
+				this->execute_upstream();
+			//	m_outgoing_audio_lock.unlock();
+			//}
 		}
 		catch (boost::thread_interrupted e) { break; }
 	}
@@ -143,7 +147,7 @@ void AudioDevice::compute(ZstInputPlug* plug)
 		}
 	}
 	
-	ZstComponent::compute(plug);
+	ZstComputeComponent::compute(plug);
 }
 
 int AudioDevice::audio_callback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* data)
@@ -152,12 +156,15 @@ int AudioDevice::audio_callback(void* outputBuffer, void* inputBuffer, unsigned 
 	if (!data_this)
 		return 0;
 
-	if (outputBuffer) {
-		data_this->SendAudioToDevice(status, outputBuffer, nBufferFrames);
-	}
-
 	if (inputBuffer) {
 		data_this->ReceiveAudioFromDevice(status, inputBuffer, nBufferFrames);
+	}
+
+	if (outputBuffer) {
+		// Audio graph is processed upstream - processed data will only be available next buffer
+		m_trigger_process_graph.notify_one();
+
+		data_this->SendAudioToDevice(status, outputBuffer, nBufferFrames);
 	}
 
 	return 0;
@@ -199,5 +206,4 @@ void AudioDevice::ReceiveAudioFromDevice(const RtAudioStreamStatus& status, void
 		m_outgoing_graph_audio_channel_buffers[channel_idx]->push(samples, nBufferFrames);
 	}
 	m_audio_buffer_received_samples = true;
-	m_outgoing_audio_lock.unlock();
 }

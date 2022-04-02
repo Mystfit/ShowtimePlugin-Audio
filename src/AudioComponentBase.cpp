@@ -5,7 +5,7 @@
 using namespace showtime;
 
 AudioComponentBase::AudioComponentBase(size_t num_device_input_channels, size_t num_device_output_channels, const char* component_type, const char* name) :
-	ZstComponent(component_type, name)
+	ZstComputeComponent(component_type, name)
 {
 	init_plugs(num_device_output_channels, num_device_input_channels);
 }

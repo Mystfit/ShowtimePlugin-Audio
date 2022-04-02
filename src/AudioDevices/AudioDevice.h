@@ -46,7 +46,10 @@ private:
 	boost::thread m_audio_graph_thread;
 	AudioSpinMutex m_outgoing_audio_lock;
 	//AudioSpinMutex m_incoming_audio_lock;
-	//std::condition_variable m_outgoing_audio_cv;
+
+	std::condition_variable m_trigger_process_graph;
+	std::mutex m_graph_mtx;
+
 	bool m_audio_buffer_received_samples;
 	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_incoming_graph_audio_channel_buffers;
 	std::vector<std::unique_ptr<RingBuffer<AUDIO_BUFFER_T> > > m_outgoing_graph_audio_channel_buffers;

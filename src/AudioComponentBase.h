@@ -1,7 +1,7 @@
 #pragma once
 
 #include <showtime/ZstExports.h>
-#include <showtime/entities/ZstComponent.h>
+#include <showtime/entities/ZstComputeComponent.h>
 #include <showtime/entities/ZstPlug.h>
 
 #include <boost/circular_buffer.hpp>
@@ -9,7 +9,7 @@
 
 typedef float AUDIO_BUFFER_T;
 
-class AudioComponentBase : public showtime::ZstComponent
+class AudioComponentBase : public showtime::ZstComputeComponent
 {
 public:
 	ZST_PLUGIN_EXPORT AudioComponentBase(size_t num_input_channels, size_t num_output_channels, const char* component_type, const char* name);
