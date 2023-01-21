@@ -4,20 +4,20 @@
 
 using namespace showtime;
 
-AudioComponentBase::AudioComponentBase(size_t num_device_input_channels, size_t num_device_output_channels, const char* component_type, const char* name) :
+AudioComponentBase::AudioComponentBase(size_t num_device_input_channels, size_t num_device_output_channels, const char* component_type, const char* name, size_t num_samples) :
 	ZstComputeComponent(component_type, name)
 {
-	init_plugs(num_device_output_channels, num_device_input_channels);
+	init_plugs(num_device_output_channels, num_device_input_channels, num_samples);
 }
 
-void AudioComponentBase::init_plugs(size_t num_incoming_plug_channels, size_t num_outgoing_plug_channels)
+void AudioComponentBase::init_plugs(size_t num_incoming_plug_channels, size_t num_outgoing_plug_channels, size_t num_samples)
 {
 	for (size_t idx = 0; idx < num_incoming_plug_channels; ++idx) {
-		m_input_channel_plugs.push_back(std::make_unique<ZstInputPlug>(fmt::format("IN_audio_{}", idx).c_str(), ZstValueType::FloatList, 1));
+		m_input_channel_plugs.push_back(std::make_unique<ZstInputPlug>(fmt::format("IN_audio_{}", idx).c_str(), ZstValueType::FloatList, 1, false, false, num_samples));
 	}
 
 	for (size_t idx = 0; idx < num_outgoing_plug_channels; ++idx) {
-		m_output_channel_plugs.push_back(std::make_unique<ZstOutputPlug>(fmt::format("OUT_audio_{}", idx).c_str(), ZstValueType::FloatList));
+		m_output_channel_plugs.push_back(std::make_unique<ZstOutputPlug>(fmt::format("OUT_audio_{}", idx).c_str(), ZstValueType::FloatList, false, num_samples));
 	}
 }
 

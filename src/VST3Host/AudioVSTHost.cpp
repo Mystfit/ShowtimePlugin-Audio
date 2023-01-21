@@ -22,7 +22,7 @@ using namespace Steinberg::Vst::EditorHost;
 
 
 AudioVSTHost::AudioVSTHost(const char* name, const char* vst_path, Vst::HostApplication* plugin_context) :
-	AudioComponentBase(0, 0, AUDIOVSTHOST_COMPONENT_TYPE, name),
+	AudioComponentBase(0, 0, AUDIOVSTHOST_COMPONENT_TYPE, name, 512),
 	m_module(nullptr),
 	m_plugProvider(nullptr),
 	m_processContext(std::make_shared<ProcessContext>()),
@@ -243,7 +243,7 @@ void AudioVSTHost::load_VST(const std::string& path, Vst::HostApplication* plugi
 				Log::entity(Log::Level::error, "Couldn't activate VST component");
 
 			// Setup plugs for VST channels
-			init_plugs(m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput));
+			init_plugs(m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kInput), m_vstPlug->getBusCount(Vst::MediaTypes::kAudio, Vst::BusDirections::kOutput), 512);
 		}
 	}
 }
@@ -325,11 +325,12 @@ void AudioVSTHost::ProcessAudio()
 	// Read floats from plug into VST buffer
 	if (m_processData.inputs) {
 		for (size_t channel_idx = 0; channel_idx < num_input_channels(); ++channel_idx) {
-			std::copy(
+			/*std::copy(
 				incoming_audio(channel_idx)->raw_value()->float_buffer(),
 				incoming_audio(channel_idx)->raw_value()->float_buffer() + incoming_audio(channel_idx)->size(),
 				m_processData.inputs->channelBuffers32[channel_idx]
-			);
+			);*/
+			m_processData.inputs->channelBuffers32[channel_idx] = (float*)incoming_audio(channel_idx)->raw_value()->release();
 		}
 	}
 
@@ -387,7 +388,7 @@ void AudioVSTHost::ProcessAudio()
 	if (m_processData.outputs) {
 		processed_VST = true;
 		for (size_t channel_idx = 0; channel_idx < num_output_channels(); ++channel_idx) {
-			outgoing_audio(channel_idx)->raw_value()->assign(m_processData.outputs->channelBuffers32[channel_idx], m_processData.numSamples);
+			outgoing_audio(channel_idx)->raw_value()->take(m_processData.outputs->channelBuffers32[channel_idx], m_processData.numSamples);
 			outgoing_audio(channel_idx)->fire();
 		}
 	}

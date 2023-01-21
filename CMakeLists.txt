@@ -26,12 +26,6 @@ elseif(${CMAKE_SIZEOF_VOID_P} STREQUAL "8")
   set(64bit FALSE)
 endif()
 
-# Set boost libraries
-set(BOOST_COMPONENTS 
-  filesystem
-  thread
-)
-
 # Build options
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
@@ -43,11 +37,17 @@ endif()
 find_package(Showtime CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 
-# Get Boost
-find_package(Boost COMPONENTS ${BOOST_COMPONENTS} CONFIG)
-if(NOT Boost_FOUND)
-    message(STATUS "Searching for Boost using cmake's FindBoost")
-    find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
+# Get boost
+include(FetchContent)
+set(BOOST_ENABLE_CMAKE ON)
+FetchContent_Declare(build_boost
+    GIT_REPOSITORY https://github.com/boostorg/boost.git
+    GIT_TAG boost-1.79.0.beta1
+)
+FetchContent_GetProperties(build_boost)
+if(NOT build_boost_POPULATED)
+    FetchContent_Populate(build_boost)
+    add_subdirectory(${build_boost_SOURCE_DIR} ${build_boost_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
 # Create Library
@@ -55,8 +55,10 @@ add_library(${AUDIO_PLUGIN_TARGET} MODULE)
 
 # Set linked libs
 set(PLUGIN_LINK_LIBS 
-    Boost::boost
     Boost::thread
+    Boost::dll
+    Boost::bimap
+    Boost::circular_buffer
     Showtime::Showtime
 )
 

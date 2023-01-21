@@ -1,0 +1,32 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Visual Studio 16 2019 Win64",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "-DCMAKE_PREFIX_PATH=F:/Code/Showtime-Cpp/build/dependencies/install/msvc-14.2/x64",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "fmt_DIR",
+          "value": "F:/Code/Showtime-Cpp/build/dependencies/install/msvc-14.2/x64/lib/cmake/fmt",
+          "type": "PATH"
+        },
+        {
+          "name": "Showtime_DIR",
+          "value": "F:/Code/Showtime-Cpp/build/install/lib/cmake/showtime",
+          "type": "PATH"
+        },
+        {
+          "name": "BUILD_LOOPER_APP",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
+    }
+  ]
+}

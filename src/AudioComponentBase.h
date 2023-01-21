@@ -12,8 +12,8 @@ typedef float AUDIO_BUFFER_T;
 class AudioComponentBase : public showtime::ZstComputeComponent
 {
 public:
-	ZST_PLUGIN_EXPORT AudioComponentBase(size_t num_input_channels, size_t num_output_channels, const char* component_type, const char* name);
-	void init_plugs(size_t num_incoming_plug_channels, size_t num_outgoing_plug_channels);
+	ZST_PLUGIN_EXPORT AudioComponentBase(size_t num_input_channels, size_t num_output_channels, const char* component_type, const char* name, size_t num_samples);
+	void init_plugs(size_t num_incoming_plug_channels, size_t num_outgoing_plug_channels, size_t num_samples);
 	
 	ZST_PLUGIN_EXPORT virtual void on_registered() override;
 

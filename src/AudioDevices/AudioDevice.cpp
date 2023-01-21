@@ -138,6 +138,7 @@ void AudioDevice::compute(ZstInputPlug* plug)
 	if (m_outgoing_graph_audio_channel_buffers.size() == m_output_channel_plugs.size()) {
 		for (size_t channel = 0; channel < m_output_channel_plugs.size(); ++channel) {
 			if (auto channel_plug = outgoing_audio(channel)) {
+				// NOOOOOOOOOOOO
 				AUDIO_BUFFER_T* samples = (AUDIO_BUFFER_T*)malloc(sizeof(float) * m_buffer_frames);
 				size_t num_frames = m_outgoing_graph_audio_channel_buffers[channel]->pop(samples, m_buffer_frames);
 				channel_plug->raw_value()->assign(samples, num_frames);
