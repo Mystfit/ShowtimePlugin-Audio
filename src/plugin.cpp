@@ -1,10 +1,13 @@
 #include "plugin.h"
+#include <boost/dll/alias.hpp>
 #include "AudioDevices/AudioFactory.h"
 #include "VST3Host/AudioVSTFactory.h"
 #include <showtime/ZstFilesystemUtils.h>
 #include <showtime/ZstLogging.h>
 
 namespace showtime {
+	BOOST_DLL_ALIAS(RtAudioPlugin::create, create_plugin);
+
 	RtAudioPlugin::RtAudioPlugin() : ZstPlugin()
 	{
 	}

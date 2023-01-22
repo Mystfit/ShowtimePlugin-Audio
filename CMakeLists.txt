@@ -35,7 +35,7 @@ endif()
 
 # Get dependencies
 find_package(Showtime CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
+#find_package(fmt CONFIG REQUIRED)
 
 # Get boost
 include(FetchContent)

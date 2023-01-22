@@ -1,6 +1,5 @@
 #pragma once
 
-#include <boost/dll/alias.hpp>
 #include <showtime/ZstPlugin.h>
 #include <showtime/ZstExports.h>
 
@@ -27,5 +26,3 @@ namespace showtime {
 		ZST_PLUGIN_EXPORT virtual int version_patch() override;
 	};
 }
-
-BOOST_DLL_ALIAS(showtime::RtAudioPlugin::create, create_plugin);
